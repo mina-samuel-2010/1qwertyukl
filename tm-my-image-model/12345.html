@@ -236,6 +236,23 @@
             display: block;
         }
 
+        .status.info {
+            background: #cce7ff;
+            color: #004085;
+            border: 1px solid #b3d7ff;
+            display: block;
+        }
+
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -281,6 +298,9 @@
             <!-- حالة التحميل -->
             <div class="status" id="status"></div>
 
+            <!-- معلومات التصحيح -->
+            <div class="debug-info" id="debugInfo"></div>
+
             <!-- قسم رفع الصور -->
             <div class="upload-section" id="uploadSection">
                 <div class="upload-box">
@@ -318,6 +338,7 @@
 
         <footer>
             <p>تم التطوير باستخدام Teachable Machine & TensorFlow.js</p>
+            <button onclick="showDebugInfo()" style="margin-top: 10px; padding: 5px 10px; background: #34495e; color: white; border: none; border-radius: 5px; cursor: pointer;">🔧 معلومات التصحيح</button>
         </footer>
     </div>
 
@@ -337,42 +358,147 @@
             statusElement.className = `status ${type}`;
             statusElement.style.display = 'block';
             
-            if (type === 'success') {
+            console.log(`Status: ${type} - ${message}`);
+        }
+
+        // عرض معلومات التصحيح
+        function showDebugInfo() {
+            const debugInfo = document.getElementById('debugInfo');
+            const files = [
+                { name: 'model.json', url: './model.json' },
+                { name: 'metadata.json', url: './metadata.json' },
+                { name: 'weights.bin', url: './weights.bin' }
+            ];
+
+            let debugHTML = '<strong>معلومات التصحيح:</strong><br>';
+            
+            // التحقق من وجود الملفات
+            files.forEach(file => {
+                debugHTML += `${file.name}: `;
+                debugHTML += `<span id="status-${file.name}">جاري الفحص...</span><br>`;
+            });
+
+            debugHTML += `<br>نموذج محمل: ${isModelLoaded ? '✅ نعم' : '❌ لا'}<br>`;
+            debugHTML += `TensorFlow.js: ${typeof tf !== 'undefined' ? '✅ محمل' : '❌ غير محمل'}<br>`;
+            debugHTML += `TM Image: ${typeof tmImage !== 'undefined' ? '✅ محمل' : '❌ غير محمل'}`;
+
+            debugInfo.innerHTML = debugHTML;
+            debugInfo.style.display = 'block';
+
+            // فحص الملفات
+            files.forEach(file => {
+                checkFileExists(file.url, file.name);
+            });
+        }
+
+        // التحقق من وجود الملف
+        async function checkFileExists(url, fileName) {
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                const statusElement = document.getElementById(`status-${fileName}`);
+                if (response.ok) {
+                    statusElement.innerHTML = '✅ موجود';
+                    statusElement.style.color = 'green';
+                } else {
+                    statusElement.innerHTML = '❌ غير موجود';
+                    statusElement.style.color = 'red';
+                }
+            } catch (error) {
+                const statusElement = document.getElementById(`status-${fileName}`);
+                statusElement.innerHTML = '❌ خطأ في الوصول';
+                statusElement.style.color = 'red';
+            }
+        }
+
+        // تحميل النموذج بطريقة بديلة
+        async function loadModel() {
+            try {
+                showStatus('🚀 جاري تحميل النموذج...', 'info');
+                
+                // طريقة بديلة لتحميل النموذج
+                const modelURL = './model.json';
+                const metadataURL = './metadata.json';
+                
+                console.log('محاولة تحميل النموذج من:', modelURL);
+                
+                // تحميل الميتاداتا أولاً
+                const metadataResponse = await fetch(metadataURL);
+                if (!metadataResponse.ok) {
+                    throw new Error(`خطأ في تحميل metadata: ${metadataResponse.status}`);
+                }
+                const metadata = await metadataResponse.json();
+                console.log('الميتاداتا محملة:', metadata);
+                
+                // تحميل النموذج
+                model = await tmImage.load(modelURL, metadataURL);
+                
+                isModelLoaded = true;
+                showStatus('✅ تم تحميل النموذج بنجاح! يمكنك الآن رفع الصور', 'success');
+                console.log('النموذج محمل بنجاح:', model);
+                
+            } catch (error) {
+                console.error('❌ خطأ في تحميل النموذج:', error);
+                showStatus(`❌ خطأ في تحميل النموذج: ${error.message}`, 'error');
+                
+                // محاولة بديلة
                 setTimeout(() => {
-                    statusElement.style.display = 'none';
+                    showStatus('🔄 محاولة تحميل النموذج مرة أخرى...', 'info');
+                    loadModelAlternative();
                 }, 3000);
             }
         }
 
-        // تحميل النموذج
-        async function loadModel() {
+        // طريقة بديلة لتحميل النموذج
+        async function loadModelAlternative() {
             try {
-                showStatus('جاري تحميل النموذج...', 'info');
+                console.log('محاولة الطريقة البديلة...');
                 
-                // استخدام المسارات النسبية
+                // استخدام tf.loadLayersModel مباشرة
                 const modelURL = './model.json';
-                const metadataURL = './metadata.json';
+                const customModel = await tf.loadLayersModel(modelURL);
                 
-                console.log('جاري تحميل النموذج من:', modelURL);
+                console.log('النموذج محمل بالطريقة البديلة:', customModel);
+                showStatus('✅ النموذج محمل (الطريقة البديلة)', 'success');
                 
-                model = await tmImage.load(modelURL, metadataURL);
+                // تهيئة النموذج للاستخدام
+                model = {
+                    predict: async (image) => {
+                        // تحويل الصورة إلى tensor
+                        const tensor = tf.browser.fromPixels(image)
+                            .resizeNearestNeighbor([224, 224])
+                            .toFloat()
+                            .expandDims();
+                        
+                        // التنبؤ
+                        const prediction = customModel.predict(tensor);
+                        const results = await prediction.data();
+                        
+                        // تحويل النتائج إلى الصيغة المطلوبة
+                        return [
+                            { className: 'مينا', probability: results[0] },
+                            { className: 'كف', probability: results[1] }
+                        ];
+                    }
+                };
                 
                 isModelLoaded = true;
-                showStatus('✅ تم تحميل النموذج بنجاح!', 'success');
-                console.log('تم تحميل النموذج بنجاح');
                 
             } catch (error) {
-                console.error('خطأ في تحميل النموذج:', error);
-                showStatus('❌ خطأ في تحميل النموذج. تأكد من وجود الملفات في المجلد الصحيح.', 'error');
+                console.error('❌ فشلت الطريقة البديلة:', error);
+                showStatus('❌ فشل تحميل النموذج. تأكد من وجود جميع الملفات في المجلد الصحيح.', 'error');
             }
         }
 
         // معالجة رفع الصورة
         function handleImageUpload(event) {
+            if (!isModelLoaded) {
+                showStatus('❌ النموذج لم يتم تحميله بعد. يرجى الانتظار...', 'error');
+                return;
+            }
+
             const file = event.target.files[0];
             if (!file) return;
 
-            // التحقق من نوع الملف
             if (!file.type.startsWith('image/')) {
                 showStatus('❌ يرجى رفع ملف صورة فقط', 'error');
                 return;
@@ -427,6 +553,11 @@
 
         // التقاط صورة من الكاميرا
         function captureImage() {
+            if (!isModelLoaded) {
+                showStatus('❌ النموذج لم يتم تحميله بعد', 'error');
+                return;
+            }
+
             const video = document.getElementById('video');
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
@@ -456,7 +587,7 @@
         // تحليل الصورة
         async function analyzeImage(imageElement) {
             if (!isModelLoaded || !model) {
-                showStatus('❌ النموذج لم يتم تحميله بعد. يرجى الانتظار...', 'error');
+                showStatus('❌ النموذج لم يتم تحميله بعد', 'error');
                 return;
             }
 
@@ -467,19 +598,17 @@
             resultSection.classList.remove('show');
 
             try {
-                // الانتظار حتى تحمل الصورة completamente
+                // الانتظار حتى تحمل الصورة
                 await new Promise((resolve, reject) => {
                     if (imageElement.complete && imageElement.naturalWidth !== 0) {
                         resolve();
                     } else {
                         imageElement.onload = resolve;
                         imageElement.onerror = reject;
-                        // وقت انتظار أقصى 5 ثواني
                         setTimeout(() => reject(new Error('Timeout loading image')), 5000);
                     }
                 });
 
-                // التنبؤ
                 console.log('جاري تحليل الصورة...');
                 const predictions = await model.predict(imageElement);
                 console.log('النتائج:', predictions);
@@ -589,18 +718,7 @@
             
             // تحميل النموذج عند فتح الصفحة
             loadModel();
-            
-            // إضافة رسالة ترحيب
-            setTimeout(() => {
-                if (!isModelLoaded) {
-                    showStatus('⚡ جاري تحميل النموذج...', 'info');
-                }
-            }, 1000);
         });
     </script>
 </body>
 </html>
-
-
-
-npx http-server
