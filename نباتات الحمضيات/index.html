@@ -60,6 +60,20 @@
             padding: 40px;
         }
         
+        .model-section {
+            background: var(--light-color);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 2px dashed var(--accent-color);
+        }
+        
+        .model-section h3 {
+            color: var(--dark-color);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
         .upload-section {
             border: 3px dashed var(--accent-color);
             border-radius: 15px;
@@ -93,7 +107,7 @@
             font-size: 1em;
         }
         
-        #fileInput {
+        #fileInput, #modelFiles {
             display: none;
         }
         
@@ -102,21 +116,25 @@
             margin-bottom: 30px;
         }
         
-        #startCamera {
+        .btn {
             background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
             color: white;
             border: none;
-            padding: 15px 30px;
+            padding: 12px 25px;
             border-radius: 50px;
-            font-size: 1.1em;
+            font-size: 1em;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-bottom: 20px;
+            margin: 5px;
         }
         
-        #startCamera:hover {
+        .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(45, 90, 39, 0.3);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--accent-color), #7aa384);
         }
         
         #video {
@@ -125,24 +143,6 @@
             border-radius: 10px;
             display: none;
             background: #000;
-        }
-        
-        #capture {
-            background: linear-gradient(135deg, var(--success-color), #219a52);
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 50px;
-            font-size: 1em;
-            cursor: pointer;
-            display: none;
-            margin: 10px auto;
-            transition: all 0.3s ease;
-        }
-        
-        #capture:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(39, 174, 96, 0.3);
         }
         
         .preview-section {
@@ -295,6 +295,27 @@
             margin-bottom: 8px;
         }
         
+        .file-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .file-input-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .file-input-item span {
+            flex: 1;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
@@ -307,6 +328,10 @@
             
             header h1 {
                 font-size: 2em;
+            }
+            
+            .file-inputs {
+                flex-direction: column;
             }
         }
     </style>
@@ -322,6 +347,31 @@
             <!-- حالة التحميل -->
             <div class="status" id="status"></div>
 
+            <!-- قسم تحميل النموذج -->
+            <div class="model-section">
+                <h3>📁 تحميل نموذج الذكاء الاصطناعي</h3>
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <button class="btn" id="loadModelBtn">تحميل النموذج التلقائي</button>
+                    <button class="btn btn-secondary" id="uploadModelBtn">رفع ملفات النموذج</button>
+                </div>
+                <input type="file" id="modelFiles" accept=".json,.bin" multiple>
+                
+                <div class="file-inputs" id="modelFilesStatus">
+                    <div class="file-input-item">
+                        <span>model.json</span>
+                        <span id="modelJsonStatus">❌ غير محمل</span>
+                    </div>
+                    <div class="file-input-item">
+                        <span>metadata.json</span>
+                        <span id="metadataJsonStatus">❌ غير محمل</span>
+                    </div>
+                    <div class="file-input-item">
+                        <span>weights.bin</span>
+                        <span id="weightsBinStatus">❌ غير محمل</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- قسم رفع الصور -->
             <div class="upload-section" id="uploadSection">
                 <div class="upload-box">
@@ -334,9 +384,9 @@
 
             <!-- قسم الكاميرا -->
             <div class="camera-section">
-                <button id="startCamera">📷 تشغيل الكاميرا</button>
+                <button class="btn" id="startCamera">📷 تشغيل الكاميرا</button>
                 <video id="video" autoplay playsinline></video>
-                <button id="capture">📸 التقاط صورة</button>
+                <button class="btn" id="capture" style="display: none;">📸 التقاط صورة</button>
             </div>
 
             <!-- معاينة الصورة -->
@@ -371,6 +421,11 @@
         let model = null;
         let videoStream = null;
         let isModelLoaded = false;
+        let modelFiles = {
+            modelJson: null,
+            metadataJson: null,
+            weightsBin: null
+        };
 
         // معلومات الأمراض
         const diseaseInfo = {
@@ -538,32 +593,109 @@
             }
         }
 
-        // تحميل النموذج
-        async function loadModel() {
+        // تحديث حالة ملفات النموذج
+        function updateModelFilesStatus() {
+            document.getElementById('modelJsonStatus').textContent = modelFiles.modelJson ? '✅ محمل' : '❌ غير محمل';
+            document.getElementById('metadataJsonStatus').textContent = modelFiles.metadataJson ? '✅ محمل' : '❌ غير محمل';
+            document.getElementById('weightsBinStatus').textContent = modelFiles.weightsBin ? '✅ محمل' : '❌ غير محمل';
+        }
+
+        // تحميل النموذج من الملفات المحملة
+        async function loadModelFromFiles() {
+            if (!modelFiles.modelJson || !modelFiles.metadataJson) {
+                showStatus('❌ يرجى تحميل ملفات model.json و metadata.json أولاً', 'error');
+                return;
+            }
+
             try {
-                showStatus('جاري تحميل نموذج الذكاء الاصطناعي...', 'info');
+                showStatus('جاري تحميل النموذج من الملفات المحملة...', 'info');
                 
-                // استخدام المسارات النسبية مع إضافة طابع زمني لمنع التخزين المؤقت
-                const timestamp = new Date().getTime();
-                const modelURL = `model.json?t=${timestamp}`;
-                const metadataURL = `metadata.json?t=${timestamp}`;
+                // إنشاء عناصر URL للبيانات
+                const modelJsonURL = URL.createObjectURL(modelFiles.modelJson);
+                const metadataJsonURL = URL.createObjectURL(modelFiles.metadataJson);
                 
-                console.log('جاري تحميل النموذج من:', modelURL);
+                console.log('جاري تحميل النموذج من الملفات المحملة');
                 
-                model = await tmImage.load(modelURL, metadataURL);
+                model = await tmImage.load(modelJsonURL, metadataJsonURL);
                 
                 isModelLoaded = true;
-                showStatus('✅ تم تحميل النموذج بنجاح! يمكنك الآن تحميل الصور للتحليل', 'success');
+                showStatus('✅ تم تحميل النموذج بنجاح من الملفات المحملة!', 'success');
                 console.log('تم تحميل النموذج بنجاح');
                 
             } catch (error) {
                 console.error('خطأ في تحميل النموذج:', error);
-                showStatus('❌ خطأ في تحميل النموذج. تأكد من وجود ملفات model.json و metadata.json و weights.bin في نفس المجلد', 'error');
+                showStatus('❌ خطأ في تحميل النموذج. تأكد من صحة ملفات النموذج', 'error');
+            }
+        }
+
+        // تحميل النموذج التلقائي
+        async function loadModelAuto() {
+            try {
+                showStatus('جاري تحميل النموذج التلقائي...', 'info');
+                
+                // محاولة تحميل النموذج من المسارات القياسية
+                const modelURL = 'model.json';
+                const metadataURL = 'metadata.json';
+                
+                console.log('جاري تحميل النموذج التلقائي من:', modelURL);
+                
+                model = await tmImage.load(modelURL, metadataURL);
+                
+                isModelLoaded = true;
+                showStatus('✅ تم تحميل النموذج بنجاح تلقائياً!', 'success');
+                console.log('تم تحميل النموذج بنجاح');
+                
+            } catch (error) {
+                console.error('خطأ في تحميل النموذج التلقائي:', error);
+                showStatus('❌ فشل التحميل التلقائي. يرجى رفع ملفات النموذج يدوياً', 'error');
+            }
+        }
+
+        // معالجة رفع ملفات النموذج
+        function handleModelFilesUpload(event) {
+            const files = event.target.files;
+            if (!files.length) return;
+
+            let foundModelJson = false;
+            let foundMetadataJson = false;
+            let foundWeightsBin = false;
+
+            for (let file of files) {
+                const fileName = file.name.toLowerCase();
+                
+                if (fileName === 'model.json') {
+                    modelFiles.modelJson = file;
+                    foundModelJson = true;
+                } else if (fileName === 'metadata.json') {
+                    modelFiles.metadataJson = file;
+                    foundMetadataJson = true;
+                } else if (fileName === 'weights.bin') {
+                    modelFiles.weightsBin = file;
+                    foundWeightsBin = true;
+                }
+            }
+
+            updateModelFilesStatus();
+
+            if (foundModelJson && foundMetadataJson) {
+                showStatus('✅ تم تحميل ملفات النموذج بنجاح!', 'success');
+                loadModelFromFiles();
+            } else {
+                let missingFiles = [];
+                if (!foundModelJson) missingFiles.push('model.json');
+                if (!foundMetadataJson) missingFiles.push('metadata.json');
+                
+                showStatus(`❌ الملفات الناقصة: ${missingFiles.join(', ')}`, 'error');
             }
         }
 
         // معالجة رفع الصورة
         function handleImageUpload(event) {
+            if (!isModelLoaded) {
+                showStatus('❌ يرجى تحميل النموذج أولاً', 'error');
+                return;
+            }
+
             const file = event.target.files[0];
             if (!file) return;
 
@@ -593,6 +725,11 @@
 
         // تشغيل الكاميرا
         async function startCamera() {
+            if (!isModelLoaded) {
+                showStatus('❌ يرجى تحميل النموذج أولاً', 'error');
+                return;
+            }
+
             try {
                 const video = document.getElementById('video');
                 const captureBtn = document.getElementById('capture');
@@ -758,8 +895,18 @@
         document.addEventListener('DOMContentLoaded', function() {
             const uploadSection = document.getElementById('uploadSection');
             const fileInput = document.getElementById('fileInput');
+            const modelFilesInput = document.getElementById('modelFiles');
             const startCameraBtn = document.getElementById('startCamera');
             const captureBtn = document.getElementById('capture');
+            const loadModelBtn = document.getElementById('loadModelBtn');
+            const uploadModelBtn = document.getElementById('uploadModelBtn');
+            
+            // أحداث تحميل النموذج
+            loadModelBtn.addEventListener('click', loadModelAuto);
+            uploadModelBtn.addEventListener('click', function() {
+                modelFilesInput.click();
+            });
+            modelFilesInput.addEventListener('change', handleModelFilesUpload);
             
             // أحداث رفع الملفات
             uploadSection.addEventListener('click', function() {
