@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كاشف الوجه والكف</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            border: 3px dashed #3498db;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #2980b9;
+            background: #e8f4fc;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            color: #3498db;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 1.3em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #7f8c8d;
+            font-size: 1em;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .camera-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        #startCamera {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        #startCamera:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(231, 76, 60, 0.3);
+        }
+
+        #video {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            display: none;
+            background: #000;
+        }
+
+        #capture {
+            background: linear-gradient(135deg, #27ae60, #219a52);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-size: 1em;
+            cursor: pointer;
+            display: none;
+            margin: 10px auto;
+            transition: all 0.3s ease;
+        }
+
+        #capture:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(39, 174, 96, 0.3);
+        }
+
+        .preview-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        #imagePreview {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        .result-section {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result-section.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .result-title {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .confidence-bar {
+            background: rgba(255,255,255,0.2);
+            border-radius: 25px;
+            margin: 15px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .confidence-fill {
+            height: 30px;
+            background: linear-gradient(90deg, #00b894, #55efc4);
+            border-radius: 25px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            min-width: 50px;
+        }
+
+        .confidence-label {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-weight: bold;
+            z-index: 2;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        .status {
+            text-align: center;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: #2c3e50;
+            color: white;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👁️ كاشف الوجه والكف 👋</h1>
+            <p>حمّل صورة أو استخدم الكاميرا للكشف التلقائي</p>
+        </header>
+
+        <div class="main-content">
+            <!-- حالة التحميل -->
+            <div class="status" id="status"></div>
+
+            <!-- قسم رفع الصور -->
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-box">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">انقر لرفع صورة</div>
+                    <div class="upload-subtext">أو اسحب وأفلت الصورة هنا</div>
+                </div>
+                <input type="file" id="fileInput" accept="image/*">
+            </div>
+
+            <!-- قسم الكاميرا -->
+            <div class="camera-section">
+                <button id="startCamera">📷 تشغيل الكاميرا</button>
+                <video id="video" autoplay playsinline></video>
+                <button id="capture">📸 التقاط صورة</button>
+            </div>
+
+            <!-- معاينة الصورة -->
+            <div class="preview-section">
+                <img id="imagePreview" alt="معاينة الصورة">
+            </div>
+
+            <!-- قسم التحميل -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>جاري تحليل الصورة...</div>
+            </div>
+
+            <!-- قسم النتائج -->
+            <div class="result-section" id="resultSection">
+                <div class="result-title" id="resultTitle">جاري التحليل...</div>
+                <div id="confidenceBars"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p>تم التطوير باستخدام Teachable Machine & TensorFlow.js</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <script>
+        // المتغيرات العامة
+        let model = null;
+        let videoStream = null;
+        let isModelLoaded = false;
+
+        // عرض الرسائل
+        function showStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            statusElement.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // تحميل النموذج
+        async function loadModel() {
+            try {
+                showStatus('جاري تحميل النموذج...', 'info');
+                
+                // استخدام المسارات النسبية
+                const modelURL = './model.json';
+                const metadataURL = './metadata.json';
+                
+                console.log('جاري تحميل النموذج من:', modelURL);
+                
+                model = await tmImage.load(modelURL, metadataURL);
+                
+                isModelLoaded = true;
+                showStatus('✅ تم تحميل النموذج بنجاح!', 'success');
+                console.log('تم تحميل النموذج بنجاح');
+                
+            } catch (error) {
+                console.error('خطأ في تحميل النموذج:', error);
+                showStatus('❌ خطأ في تحميل النموذج. تأكد من وجود الملفات في المجلد الصحيح.', 'error');
+            }
+        }
+
+        // معالجة رفع الصورة
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // التحقق من نوع الملف
+            if (!file.type.startsWith('image/')) {
+                showStatus('❌ يرجى رفع ملف صورة فقط', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.getElementById('imagePreview');
+                img.onload = function() {
+                    analyzeImage(img);
+                };
+                img.src = e.target.result;
+                img.style.display = 'block';
+                showStatus('📁 تم تحميل الصورة بنجاح', 'success');
+            };
+            
+            reader.onerror = function() {
+                showStatus('❌ خطأ في قراءة الملف', 'error');
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        // تشغيل الكاميرا
+        async function startCamera() {
+            try {
+                const video = document.getElementById('video');
+                const captureBtn = document.getElementById('capture');
+                const startBtn = document.getElementById('startCamera');
+
+                videoStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 }, 
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    } 
+                });
+                
+                video.srcObject = videoStream;
+                video.style.display = 'block';
+                captureBtn.style.display = 'block';
+                startBtn.style.display = 'none';
+                
+                video.play();
+                showStatus('📷 الكاميرا جاهزة للاستخدام', 'success');
+                
+            } catch (error) {
+                console.error('خطأ في تشغيل الكاميرا:', error);
+                showStatus('❌ تعذر الوصول إلى الكاميرا. تأكد من السماح باستخدام الكاميرا.', 'error');
+            }
+        }
+
+        // التقاط صورة من الكاميرا
+        function captureImage() {
+            const video = document.getElementById('video');
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const img = document.getElementById('imagePreview');
+            img.onload = function() {
+                analyzeImage(img);
+            };
+            img.src = canvas.toDataURL('image/png');
+            img.style.display = 'block';
+            
+            // إيقاف الكاميرا
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                video.style.display = 'none';
+                document.getElementById('capture').style.display = 'none';
+                document.getElementById('startCamera').style.display = 'block';
+            }
+            
+            showStatus('📸 تم التقاط الصورة بنجاح', 'success');
+        }
+
+        // تحليل الصورة
+        async function analyzeImage(imageElement) {
+            if (!isModelLoaded || !model) {
+                showStatus('❌ النموذج لم يتم تحميله بعد. يرجى الانتظار...', 'error');
+                return;
+            }
+
+            const loadingElement = document.getElementById('loading');
+            const resultSection = document.getElementById('resultSection');
+            
+            loadingElement.style.display = 'block';
+            resultSection.classList.remove('show');
+
+            try {
+                // الانتظار حتى تحمل الصورة completamente
+                await new Promise((resolve, reject) => {
+                    if (imageElement.complete && imageElement.naturalWidth !== 0) {
+                        resolve();
+                    } else {
+                        imageElement.onload = resolve;
+                        imageElement.onerror = reject;
+                        // وقت انتظار أقصى 5 ثواني
+                        setTimeout(() => reject(new Error('Timeout loading image')), 5000);
+                    }
+                });
+
+                // التنبؤ
+                console.log('جاري تحليل الصورة...');
+                const predictions = await model.predict(imageElement);
+                console.log('النتائج:', predictions);
+                
+                loadingElement.style.display = 'none';
+                displayResults(predictions);
+                
+            } catch (error) {
+                console.error('خطأ في تحليل الصورة:', error);
+                loadingElement.style.display = 'none';
+                showStatus('❌ حدث خطأ أثناء تحليل الصورة', 'error');
+            }
+        }
+
+        // عرض النتائج
+        function displayResults(predictions) {
+            const resultSection = document.getElementById('resultSection');
+            const resultTitle = document.getElementById('resultTitle');
+            const confidenceBars = document.getElementById('confidenceBars');
+            
+            // فرز التنبؤات حسب الثقة
+            predictions.sort((a, b) => b.probability - a.probability);
+            
+            const topPrediction = predictions[0];
+            const confidence = Math.round(topPrediction.probability * 100);
+            
+            // تحديد النتيجة
+            let resultText = '';
+            let resultEmoji = '';
+            
+            if (topPrediction.className === 'مينا') {
+                resultText = 'تم اكتشاف وجه!';
+                resultEmoji = '👁️';
+            } else if (topPrediction.className === 'كف') {
+                resultText = 'تم اكتشاف كف اليد!';
+                resultEmoji = '👋';
+            } else {
+                resultText = 'لم يتم التعرف على شيء';
+                resultEmoji = '❌';
+            }
+            
+            resultTitle.innerHTML = `${resultEmoji} ${resultText}<br><small>ثقة: ${confidence}%</small>`;
+            
+            // إنشاء أشرطة الثقة
+            confidenceBars.innerHTML = '';
+            predictions.forEach(pred => {
+                const confidence = Math.round(pred.probability * 100);
+                const bar = document.createElement('div');
+                bar.className = 'confidence-bar';
+                bar.innerHTML = `
+                    <div class="confidence-label">${pred.className}</div>
+                    <div class="confidence-fill" style="width: ${confidence}%">
+                        ${confidence}%
+                    </div>
+                `;
+                confidenceBars.appendChild(bar);
+            });
+            
+            resultSection.classList.add('show');
+            showStatus('✅ تم تحليل الصورة بنجاح', 'success');
+        }
+
+        // تهيئة التطبيق
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadSection = document.getElementById('uploadSection');
+            const fileInput = document.getElementById('fileInput');
+            const startCameraBtn = document.getElementById('startCamera');
+            const captureBtn = document.getElementById('capture');
+            
+            // أحداث رفع الملفات
+            uploadSection.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', handleImageUpload);
+            
+            // أحداث الكاميرا
+            startCameraBtn.addEventListener('click', startCamera);
+            captureBtn.addEventListener('click', captureImage);
+            
+            // دعم سحب وإفلات الصور
+            uploadSection.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#27ae60';
+                this.style.background = '#d4edda';
+            });
+            
+            uploadSection.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#3498db';
+                this.style.background = '#f8f9fa';
+            });
+            
+            uploadSection.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#3498db';
+                this.style.background = '#f8f9fa';
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('image/')) {
+                    fileInput.files = files;
+                    handleImageUpload({ target: { files: files } });
+                } else {
+                    showStatus('❌ يرجى سحب ملف صورة فقط', 'error');
+                }
+            });
+            
+            // تحميل النموذج عند فتح الصفحة
+            loadModel();
+            
+            // إضافة رسالة ترحيب
+            setTimeout(() => {
+                if (!isModelLoaded) {
+                    showStatus('⚡ جاري تحميل النموذج...', 'info');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
+
+
+
+npx http-server
